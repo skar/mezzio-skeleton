@@ -24,5 +24,5 @@ use Psr\Container\ContainerInterface;
  * $app->route('/contact', App\Handler\ContactHandler::class, ['GET', 'POST', ...], 'contact');
  */
 
-return static function (Application $app, MiddlewareFactory $factory, ContainerInterface $container): void {
+return static function(Application $app, MiddlewareFactory $factory, ContainerInterface $container): void {
 };

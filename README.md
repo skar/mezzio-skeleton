@@ -46,8 +46,7 @@ the selection **you can actually type the package name and version**.
 > ```text
 >   Which template engine do you want to use?
 >   [1] Plates
->   [2] Twig
->   [3] zend-view installs zend-servicemanager
+>   [2] zend-view installs zend-servicemanager
 >   [n] None of the above
 >   Make your selection or type a composer package name and version (n): infw/pug:0.1
 >   - Searching for infw/pug:0.1
@@ -128,8 +127,9 @@ This section applies only if you cloned this repo with `git clone`, not when you
 installed mezzio with `composer create-project ...`.
 
 If you want to run tests against the installer, you need to clone this repo and
-setup all dependencies with composer.  Make sure you **prevent composer running
-scripts** with `--no-scripts`, otherwise it will remove the installer and all
+setup all dependencies with composer.  
+Make sure you **prevent composer running scripts** with `--no-scripts`, otherwise
+it will remove the installer and all
 tests.
 
 ```bash

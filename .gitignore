@@ -1,7 +1,14 @@
+/config/development.config.php
+/config/autoload/local.php
+/config/autoload/*.local.php
+/vendor/
+/.env
+/.phpcs.xml
 /.phpcs-cache
 /.psalm-cache
+/.phpunit.result.cache
 /.phpunit.cache
+/docker-compose.override.yaml
 /clover.xml
 /coveralls-upload.json
 /phpunit.xml
-/vendor/

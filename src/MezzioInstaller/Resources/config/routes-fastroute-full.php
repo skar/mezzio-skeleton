@@ -37,7 +37,7 @@ use Psr\Container\ContainerInterface;
  * );
  */
 
-return static function (Application $app, MiddlewareFactory $factory, ContainerInterface $container): void {
-    $app->get('/', App\Handler\HomePageHandler::class, 'home');
-    $app->get('/api/ping', App\Handler\PingHandler::class, 'api.ping');
+return static function(Application $app, MiddlewareFactory $factory, ContainerInterface $container): void {
+	$app->get('/', App\Handler\HomePageHandler::class, 'home');
+	$app->get('/api/ping', App\Handler\PingHandler::class, 'api.ping');
 };
