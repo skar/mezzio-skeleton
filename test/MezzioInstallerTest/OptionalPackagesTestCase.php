@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 namespace MezzioInstallerTest;
@@ -14,7 +13,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 use ReflectionProperty;
-
 use function array_fill_keys;
 use function array_key_exists;
 use function file_get_contents;
@@ -23,219 +21,211 @@ use function json_decode;
 use function putenv;
 use function realpath;
 use function sprintf;
-
 use const JSON_THROW_ON_ERROR;
 
 // phpcs:ignore WebimpressCodingStandard.NamingConventions.AbstractClass.Prefix
-abstract class OptionalPackagesTestCase extends TestCase
-{
-    /** @var Composer&MockObject */
-    protected $composer;
+abstract class OptionalPackagesTestCase extends TestCase {
+	/** @var Composer&MockObject */
+	protected $composer;
 
-    /** @var array Array version of composer.json */
-    protected $composerData = [];
+	/** @var array Array version of composer.json */
+	protected $composerData = [];
 
-    /** @var IOInterface&MockObject */
-    protected $io;
+	/** @var IOInterface&MockObject */
+	protected $io;
 
-    /** @var string Root of this package. */
-    protected $packageRoot;
+	/** @var string Root of this package. */
+	protected $packageRoot;
 
-    /** @var RootPackage&MockObject */
-    protected $rootPackage;
+	/** @var RootPackage&MockObject */
+	protected $rootPackage;
 
-    /**
-     * Assert that the installer contains a specification for the package.
-     *
-     * @throws AssertionFailedError
-     */
-    public static function assertPackage(
-        string $package,
-        OptionalPackages $installer,
-        ?string $message = null
-    ): void {
-        $message = $message ?: sprintf('Failed asserting that package "%s" is present in the installer', $package);
-        $found   = false;
+	/**
+	 * Assert that the installer contains a specification for the package.
+	 *
+	 * @throws AssertionFailedError
+	 */
+	public static function assertPackage(
+		string           $package,
+		OptionalPackages $installer,
+		?string          $message = null
+	): void {
+		$message ??= sprintf('Failed asserting that package "%s" is present in the installer', $package);
+		$found = false;
 
-        foreach (['composerRequires', 'composerDevRequires'] as $property) {
-            $r = new ReflectionProperty($installer, $property);
-            if (array_key_exists($package, $r->getValue($installer))) {
-                $found = true;
-                break;
-            }
-        }
+		foreach ([ 'composerRequires', 'composerDevRequires' ] as $property) {
+			$r = new ReflectionProperty($installer, $property);
+			if (array_key_exists($package, $r->getValue($installer))) {
+				$found = true;
+				break;
+			}
+		}
 
-        self::assertThat($found, self::isTrue(), $message);
-    }
+		self::assertThat($found, self::isTrue(), $message);
+	}
 
-    /**
-     * Assert that the installer DOES NOT contain a specification for the package.
-     *
-     * @throws AssertionFailedError
-     */
-    public static function assertNotPackage(
-        string $package,
-        OptionalPackages $installer,
-        ?string $message = null
-    ): void {
-        $message = $message ?: sprintf('Failed asserting that package "%s" is absent from the installer', $package);
-        $found   = false;
+	/**
+	 * Assert that the installer DOES NOT contain a specification for the package.
+	 *
+	 * @throws AssertionFailedError
+	 */
+	public static function assertNotPackage(
+		string           $package,
+		OptionalPackages $installer,
+		?string          $message = null
+	): void {
+		$message ??= sprintf('Failed asserting that package "%s" is absent from the installer', $package);
+		$found = false;
 
-        foreach (['composerRequires', 'composerDevRequires'] as $property) {
-            $r = new ReflectionProperty($installer, $property);
-            if (array_key_exists($package, $r->getValue($installer))) {
-                $found = true;
-                break;
-            }
-        }
+		foreach ([ 'composerRequires', 'composerDevRequires' ] as $property) {
+			$r = new ReflectionProperty($installer, $property);
+			if (array_key_exists($package, $r->getValue($installer))) {
+				$found = true;
+				break;
+			}
+		}
 
-        self::assertThat($found, self::isFalse(), $message);
-    }
+		self::assertThat($found, self::isFalse(), $message);
+	}
 
-    /**
-     * Assert that the installer DOES NOT contain a specification for each package in the list.
-     *
-     * @param string[] $packages
-     * @throws AssertionFailedError
-     */
-    public static function assertPackages(
-        array $packages,
-        OptionalPackages $installer,
-        ?string $message = null
-    ): void {
-        foreach ($packages as $package) {
-            self::assertPackage($package, $installer, $message);
-        }
-    }
+	/**
+	 * Assert that the installer DOES NOT contain a specification for each package in the list.
+	 *
+	 * @param string[] $packages
+	 *
+	 * @throws AssertionFailedError
+	 */
+	public static function assertPackages(
+		array            $packages,
+		OptionalPackages $installer,
+		?string          $message = null
+	): void {
+		foreach ($packages as $package) {
+			self::assertPackage($package, $installer, $message);
+		}
+	}
 
-    /**
-     * Assert that the installer contains a specification for each package in the list.
-     *
-     * @param string[] $packages
-     * @throws AssertionFailedError
-     */
-    public static function assertNotPackages(
-        array $packages,
-        OptionalPackages $installer,
-        ?string $message = null
-    ): void {
-        foreach ($packages as $package) {
-            self::assertNotPackage($package, $installer, $message);
-        }
-    }
+	/**
+	 * Assert that the installer contains a specification for each package in the list.
+	 *
+	 * @param string[] $packages
+	 *
+	 * @throws AssertionFailedError
+	 */
+	public static function assertNotPackages(
+		array            $packages,
+		OptionalPackages $installer,
+		?string          $message = null
+	): void {
+		foreach ($packages as $package) {
+			self::assertNotPackage($package, $installer, $message);
+		}
+	}
 
-    /**
-     * Assert that the installer contains a specification for the package.
-     *
-     * @throws AssertionFailedError
-     */
-    public static function assertWhitelisted(
-        string $package,
-        OptionalPackages $installer,
-        ?string $message = null
-    ): void {
-        $message = $message ?: sprintf('Failed asserting that package "%s" is whitelisted in composer.json', $package);
-        $found   = false;
+	/**
+	 * Assert that the installer contains a specification for the package.
+	 *
+	 * @throws AssertionFailedError
+	 */
+	public static function assertWhitelisted(
+		string           $package,
+		OptionalPackages $installer,
+		?string          $message = null
+	): void {
+		$message ??= sprintf('Failed asserting that package "%s" is whitelisted in composer.json', $package);
+		$found = false;
 
-        $r = new ReflectionProperty($installer, 'composerDefinition');
+		$r = new ReflectionProperty($installer, 'composerDefinition');
 
-        $whitelist = $r->getValue($installer)['extra']['laminas']['component-whitelist'];
+		$whitelist = $r->getValue($installer)['extra']['laminas']['component-whitelist'];
 
-        if (in_array($package, $whitelist)) {
-            $found = true;
-        }
+		if (in_array($package, $whitelist)) {
+			$found = true;
+		}
 
-        self::assertThat($found, self::isTrue(), $message);
-    }
+		self::assertThat($found, self::isTrue(), $message);
+	}
 
-    protected function setUp(): void
-    {
-        $this->packageRoot = realpath(__DIR__ . '/../../');
-        putenv('COMPOSER=' . $this->packageRoot . '/composer.json');
-    }
+	protected function setUp(): void {
+		$this->packageRoot = realpath(__DIR__ . '/../../');
+		putenv('COMPOSER=' . $this->packageRoot . '/composer.json');
+	}
 
-    protected function tearDown(): void
-    {
-        putenv('COMPOSER=');
-    }
+	protected function tearDown(): void {
+		putenv('COMPOSER=');
+	}
 
-    /**
-     * Create the OptionalPackages installer instance.
-     *
-     * Creates the IOInterface and Composer mock instances when doing so,
-     * and uses the provided $projectRoot, if specified.
-     */
-    protected function createOptionalPackages(?string $projectRoot = null): OptionalPackages
-    {
-        $projectRoot = $projectRoot ?: $this->packageRoot;
-        $this->io    = $this->createMock(IOInterface::class);
-        return new OptionalPackages(
-            $this->io,
-            $this->createComposer(),
-            $projectRoot
-        );
-    }
+	/**
+	 * Create the OptionalPackages installer instance.
+	 *
+	 * Creates the IOInterface and Composer mock instances when doing so,
+	 * and uses the provided $projectRoot, if specified.
+	 */
+	protected function createOptionalPackages(?string $projectRoot = null): OptionalPackages {
+		$projectRoot ??= $this->packageRoot;
+		$this->io = $this->createMock(IOInterface::class);
 
-    protected function createComposer(): Composer&MockObject
-    {
-        $this->composer = $this->createMock(Composer::class);
-        $this->composer->method('getPackage')->willReturn(
-            $this->createRootPackage(),
-        );
+		return new OptionalPackages(
+			$this->io,
+			$this->createComposer(),
+			$projectRoot
+		);
+	}
 
-        return $this->composer;
-    }
+	protected function createComposer(): Composer&MockObject {
+		$this->composer = $this->createMock(Composer::class);
+		$this->composer->method('getPackage')->willReturn(
+			$this->createRootPackage(),
+		);
 
-    protected function createRootPackage(): RootPackage&MockObject
-    {
-        $composerJson      = json_decode(
-            file_get_contents($this->packageRoot . '/composer.json'),
-            true,
-            512,
-            JSON_THROW_ON_ERROR
-        );
-        $this->rootPackage = $this->createMock(RootPackage::class);
+		return $this->composer;
+	}
 
-        $this->rootPackage->method('getRequires')->willReturn($composerJson['require']);
-        $this->rootPackage->method('getDevRequires')->willReturn($composerJson['require-dev']);
-        $this->rootPackage->method('getStabilityFlags')->willReturn($this->getStabilityFlags());
+	protected function createRootPackage(): RootPackage&MockObject {
+		$composerJson = json_decode(
+			file_get_contents($this->packageRoot . '/composer.json'),
+			true,
+			512,
+			JSON_THROW_ON_ERROR
+		);
+		$this->rootPackage = $this->createMock(RootPackage::class);
 
-        return $this->rootPackage;
-    }
+		$this->rootPackage->method('getRequires')->willReturn($composerJson['require']);
+		$this->rootPackage->method('getDevRequires')->willReturn($composerJson['require-dev']);
+		$this->rootPackage->method('getStabilityFlags')->willReturn($this->getStabilityFlags());
 
-    protected function getStabilityFlags(): array
-    {
-        $r          = new ReflectionClass(OptionalPackages::class);
-        $properties = $r->getDefaultProperties();
+		return $this->rootPackage;
+	}
 
-        return array_fill_keys($properties['devDependencies'], BasePackage::STABILITY_DEV);
-    }
+	protected function getStabilityFlags(): array {
+		$r = new ReflectionClass(OptionalPackages::class);
+		$properties = $r->getDefaultProperties();
 
-    /**
-     * Retrieve a single property value from the installer.
-     *
-     * @return mixed
-     */
-    protected function getInstallerProperty(OptionalPackages $installer, string $property)
-    {
-        $r = new ReflectionProperty($installer, $property);
+		return array_fill_keys($properties['devDependencies'], BasePackage::STABILITY_DEV);
+	}
 
-        return $r->getValue($installer);
-    }
+	/**
+	 * Retrieve a single property value from the installer.
+	 *
+	 * @return mixed
+	 */
+	protected function getInstallerProperty(OptionalPackages $installer, string $property) {
+		$r = new ReflectionProperty($installer, $property);
 
-    /**
-     * Retrieve the stored composer data structure from an installer instance.
-     */
-    protected function getComposerDataFromInstaller(OptionalPackages $installer): array
-    {
-        return $this->getInstallerProperty($installer, 'composerDefinition');
-    }
+		return $r->getValue($installer);
+	}
 
-    /**
-     * Retrieve the stored resource configuration from an installer instance.
-     */
-    protected function getInstallerConfig(OptionalPackages $installer): array
-    {
-        return $this->getInstallerProperty($installer, 'config');
-    }
+	/**
+	 * Retrieve the stored composer data structure from an installer instance.
+	 */
+	protected function getComposerDataFromInstaller(OptionalPackages $installer): array {
+		return $this->getInstallerProperty($installer, 'composerDefinition');
+	}
+
+	/**
+	 * Retrieve the stored resource configuration from an installer instance.
+	 */
+	protected function getInstallerConfig(OptionalPackages $installer): array {
+		return $this->getInstallerProperty($installer, 'config');
+	}
 }
