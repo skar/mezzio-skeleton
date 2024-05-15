@@ -1,7 +1,13 @@
+/vendor/
+
+/.env
+
+/phpcs.xml
 /.phpcs-cache
-/.psalm-cache
+
+/phpunit.xml
 /.phpunit.cache
+
+/.psalm-cache
 /clover.xml
 /coveralls-upload.json
-/phpunit.xml
-/vendor/

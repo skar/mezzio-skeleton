@@ -1,11 +1,10 @@
 <?php
-
 declare(strict_types=1);
 
 namespace MezzioInstallerTest;
 
-use App\Handler\HomePageHandler;
-use App\Handler\PingHandler;
+use App\Handler\HomePage;
+use App\Handler\Ping;
 use DirectoryIterator;
 use Laminas\Diactoros\ServerRequest;
 use Laminas\Stratigility\Middleware\ErrorHandler;
@@ -27,6 +26,7 @@ use function chdir;
 use function copy;
 use function file_exists;
 use function in_array;
+use function is_callable;
 use function is_dir;
 use function ltrim;
 use function mkdir;
@@ -40,268 +40,259 @@ use function str_starts_with;
 use function sys_get_temp_dir;
 use function uniqid;
 use function unlink;
-
 use const DIRECTORY_SEPARATOR;
 
-trait ProjectSandboxTrait
-{
-    /**
-     * @var null|callable Additional autoloader to prepend to stack.
-     *     Used when flat install is requested.
-     */
-    protected $autoloader;
+trait ProjectSandboxTrait {
+	/**
+	 * @var null|callable Additional autoloader to prepend to stack.
+	 *     Used when flat install is requested.
+	 */
+	protected $autoloader;
 
-    /** @var null|ContainerInterface */
-    protected $container;
+	/** @var null|ContainerInterface */
+	protected $container;
 
-    /** @var string Root of the sandbox system */
-    protected $projectRoot;
+	/** @var string Root of the sandbox system */
+	protected $projectRoot;
 
-    /**
-     * Copies the project files into a temporary filesystem.
-     *
-     * Sets the path to the new temporary filesystem in the $projectRoot
-     * property, changes the working directory to that new location, and
-     * returns the location.
-     *
-     * cleanup() recursively removes the created directory.
-     */
-    protected function copyProjectFilesToTempFilesystem(): string
-    {
-        $this->projectRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('exp');
+	/**
+	 * Copies the project files into a temporary filesystem.
+	 *
+	 * Sets the path to the new temporary filesystem in the $projectRoot
+	 * property, changes the working directory to that new location, and
+	 * returns the location.
+	 *
+	 * cleanup() recursively removes the created directory.
+	 */
+	protected function copyProjectFilesToTempFilesystem(): string {
+		$this->projectRoot = sys_get_temp_dir() . DIRECTORY_SEPARATOR . uniqid('exp');
 
-        mkdir($this->projectRoot . '/data', 0777, true);
-        mkdir($this->projectRoot . '/data/cache', 0777, true);
-        copy($this->packageRoot . '/composer.json', $this->projectRoot . '/composer.json');
-        foreach (['config', 'public', 'src', 'templates', 'test'] as $path) {
-            $this->recursiveCopy(
-                $this->packageRoot . DIRECTORY_SEPARATOR . $path,
-                $this->projectRoot . DIRECTORY_SEPARATOR . $path
-            );
-        }
+		mkdir($this->projectRoot . '/data', 0777, true);
+		mkdir($this->projectRoot . '/data/cache', 0777, true);
+		copy($this->packageRoot . '/composer.json', $this->projectRoot . '/composer.json');
+		foreach ([ 'config', 'public', 'src', 'templates', 'test' ] as $path) {
+			$this->recursiveCopy(
+				$this->packageRoot . DIRECTORY_SEPARATOR . $path,
+				$this->projectRoot . DIRECTORY_SEPARATOR . $path
+			);
+		}
 
-        chdir($this->projectRoot);
-        return $this->projectRoot;
-    }
+		chdir($this->projectRoot);
 
-    /**
-     * Prepare the sandbox for the selected instalation type.
-     *
-     * Sets the installer's install type, and sets up the application structure.
-     *
-     * If a non-minimal install type is selected, also sets up the alternate
-     * autoloader to ensure the `App` namespace resolves correctly.
-     */
-    protected function prepareSandboxForInstallType(string $installType, OptionalPackages $installer): void
-    {
-        $installer->setInstallType($installType);
-        $installer->setupDefaultApp();
+		return $this->projectRoot;
+	}
 
-        if ($installType === OptionalPackages::INSTALL_FLAT) {
-            $this->setUpAlternateAutoloader('/src/');
-        } elseif ($installType === OptionalPackages::INSTALL_MODULAR) {
-            $this->setUpAlternateAutoloader('/src/App/src/', true);
-        }
-    }
+	/**
+	 * Prepare the sandbox for the selected instalation type.
+	 *
+	 * Sets the installer's install type, and sets up the application structure.
+	 *
+	 * If a non-minimal install type is selected, also sets up the alternate
+	 * autoloader to ensure the `App` namespace resolves correctly.
+	 */
+	protected function prepareSandboxForInstallType(string $installType, OptionalPackages $installer): void {
+		$installer->setInstallType($installType);
+		$installer->setupDefaultApp();
 
-    /**
-     * Enable development-mode configuration within the sandbox.
-     */
-    protected function enableDevelopmentMode(): void
-    {
-        $target = sprintf(
-            '%s%sconfig%sdevelopment.config.php',
-            $this->projectRoot,
-            DIRECTORY_SEPARATOR,
-            DIRECTORY_SEPARATOR
-        );
-        copy($target . '.dist', $target);
+		if ($installType === OptionalPackages::INSTALL_FLAT) {
+			$this->setUpAlternateAutoloader('/src/');
+		} elseif ($installType === OptionalPackages::INSTALL_MODULAR) {
+			$this->setUpAlternateAutoloader('/src/App/src/', true);
+		}
+	}
 
-        Assert::assertFileExists($target);
+	/**
+	 * Enable development-mode configuration within the sandbox.
+	 */
+	protected function enableDevelopmentMode(): void {
+		$target = sprintf(
+			'%s%sconfig%sdevelopment.config.php',
+			$this->projectRoot,
+			DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR
+		);
+		copy($target . '.dist', $target);
 
-        $target = sprintf(
-            '%s%sconfig%sautoload%sdevelopment.local.php',
-            $this->projectRoot,
-            DIRECTORY_SEPARATOR,
-            DIRECTORY_SEPARATOR,
-            DIRECTORY_SEPARATOR
-        );
-        copy($target . '.dist', $target);
+		Assert::assertFileExists($target);
 
-        Assert::assertFileExists($target);
-    }
+		$target = sprintf(
+			'%s%sconfig%sautoload%sdevelopment.local.php',
+			$this->projectRoot,
+			DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR,
+			DIRECTORY_SEPARATOR
+		);
+		copy($target . '.dist', $target);
 
-    /**
-     * Adds an alternate autoloader to the stack for the App namespace.
-     *
-     * Required, as the tests will load classes from that namespace, but the
-     * class files will exist in temporary directories.
-     *
-     * Any test that uses this (and it's implicit when using setInstallType())
-     * MUST run in a separate process.
-     *
-     * tearDown() unregisters the autoloader.
-     *
-     * @param string $appPath The path to the App namespace source code,
-     *     relative to the project root.
-     * @param bool   $stripNamespace Whether or not to strip the initial
-     *       namespace when determining the path (ala PSR-4).
-     */
-    protected function setUpAlternateAutoloader(string $appPath, bool $stripNamespace = false): void
-    {
-        $this->autoloader = function (string $class) use ($appPath, $stripNamespace): bool {
-            if (! str_starts_with($class, 'App\\')) {
-                return false;
-            }
+		Assert::assertFileExists($target);
+	}
 
-            $class = $stripNamespace
-                ? str_replace('App\\', '', $class)
-                : $class;
+	/**
+	 * Adds an alternate autoloader to the stack for the App namespace.
+	 *
+	 * Required, as the tests will load classes from that namespace, but the
+	 * class files will exist in temporary directories.
+	 *
+	 * Any test that uses this (and it's implicit when using setInstallType())
+	 * MUST run in a separate process.
+	 *
+	 * tearDown() unregisters the autoloader.
+	 *
+	 * @param string $appPath The path to the App namespace source code,
+	 *     relative to the project root.
+	 * @param bool $stripNamespace Whether or not to strip the initial
+	 *       namespace when determining the path (ala PSR-4).
+	 */
+	protected function setUpAlternateAutoloader(string $appPath, bool $stripNamespace = false): void {
+		$this->autoloader = function(string $class) use ($appPath, $stripNamespace): bool {
+			if (!str_starts_with($class, 'App\\')) {
+				return false;
+			}
 
-            $path = $this->projectRoot
-                . $appPath
-                . str_replace('\\', '/', $class)
-                . '.php';
+			$class = $stripNamespace
+				? str_replace('App\\', '', $class)
+				: $class;
 
-            if (! file_exists($path)) {
-                return false;
-            }
+			$path = $this->projectRoot
+				. $appPath
+				. str_replace('\\', '/', $class)
+				. '.php';
 
-            include $path;
-            return true;
-        };
+			if (!file_exists($path)) {
+				return false;
+			}
 
-        spl_autoload_register($this->autoloader, true, true);
-    }
+			include $path;
 
-    /**
-     * Remove the alternate autolader, if present.
-     */
-    protected function tearDownAlternateAutoloader(): void
-    {
-        if ($this->autoloader) {
-            spl_autoload_unregister($this->autoloader);
-            unset($this->autoloader);
-        }
-    }
+			return true;
+		};
 
-    /**
-     * Returns the configured container for the sandbox project.
-     */
-    protected function getContainer(): ContainerInterface
-    {
-        if ($this->container) {
-            return $this->container;
-        }
+		spl_autoload_register($this->autoloader, true, true);
+	}
 
-        $path = $this->projectRoot
-            ? $this->projectRoot . '/config/container.php'
-            : 'config/container.php';
+	/**
+	 * Remove the alternate autolader, if present.
+	 */
+	protected function tearDownAlternateAutoloader(): void {
+		if (is_callable($this->autoloader)) {
+			spl_autoload_unregister($this->autoloader);
+			unset($this->autoloader);
+		}
+	}
 
-        $this->container = require $path;
+	/**
+	 * Returns the configured container for the sandbox project.
+	 */
+	protected function getContainer(): ContainerInterface {
+		if ($this->container) {
+			return $this->container;
+		}
 
-        return $this->container;
-    }
+		$path = $this->projectRoot
+			? $this->projectRoot . '/config/container.php'
+			: 'config/container.php';
 
-    /**
-     * Creates and dispatches an application at the requested path.
-     *
-     * @param string $path Path to request within the application
-     * @param bool   $setupRoutes Whether or not to setup routes before dispatch
-     */
-    protected function getAppResponse(string $path = '/', bool $setupRoutes = true): ResponseInterface
-    {
-        $container = $this->getContainer();
+		$this->container = require $path;
 
-        /** @var Application $app */
-        $app = $container->get(Application::class);
+		return $this->container;
+	}
 
-        // Import programmatic/declarative middleware pipeline and routing configuration statements
-        $app->pipe(ErrorHandler::class);
-        $app->pipe(ServerUrlMiddleware::class);
-        $app->pipe(RouteMiddleware::class);
-        $app->pipe(MethodNotAllowedMiddleware::class);
-        $app->pipe(ImplicitHeadMiddleware::class);
-        $app->pipe(ImplicitOptionsMiddleware::class);
-        $app->pipe(UrlHelperMiddleware::class);
-        $app->pipe(DispatchMiddleware::class);
-        $app->pipe(NotFoundHandler::class);
+	/**
+	 * Creates and dispatches an application at the requested path.
+	 *
+	 * @param string $path Path to request within the application
+	 * @param bool $setupRoutes Whether or not to setup routes before dispatch
+	 */
+	protected function getAppResponse(string $path = '/', bool $setupRoutes = true): ResponseInterface {
+		$container = $this->getContainer();
 
-        if ($setupRoutes && $container->has(HomePageHandler::class)) {
-            $app->get('/', HomePageHandler::class, 'home');
-        }
+		/** @var Application $app */
+		$app = $container->get(Application::class);
 
-        if ($setupRoutes && $container->has(PingHandler::class)) {
-            $app->get('/api/ping', PingHandler::class, 'api.ping');
-        }
+		// Import programmatic/declarative middleware pipeline and routing configuration statements
+		$app->pipe(ErrorHandler::class);
+		$app->pipe(ServerUrlMiddleware::class);
+		$app->pipe(RouteMiddleware::class);
+		$app->pipe(MethodNotAllowedMiddleware::class);
+		$app->pipe(ImplicitHeadMiddleware::class);
+		$app->pipe(ImplicitOptionsMiddleware::class);
+		$app->pipe(UrlHelperMiddleware::class);
+		$app->pipe(DispatchMiddleware::class);
+		$app->pipe(NotFoundHandler::class);
 
-        return $app->handle(
-            new ServerRequest([], [], 'https://example.com' . $path, 'GET')
-        );
-    }
+		if ($setupRoutes && $container->has(HomePage::class)) {
+			$app->get('/', HomePage::class, 'home');
+		}
 
-    /**
-     * Recursively copy the files from one tree to another.
-     */
-    protected function recursiveCopy(string $source, string $target): void
-    {
-        if (! is_dir($target)) {
-            mkdir($target, 0777, true);
-        }
+		if ($setupRoutes && $container->has(Ping::class)) {
+			$app->get('/api/ping', Ping::class, 'api.ping');
+		}
 
-        if (! is_dir($source)) {
-            return;
-        }
+		return $app->handle(
+			new ServerRequest([], [], 'https://example.com' . $path, 'GET')
+		);
+	}
 
-        $dir = new DirectoryIterator($source);
-        foreach ($dir as $fileInfo) {
-            if ($fileInfo->isFile()) {
-                $realPath = $fileInfo->getRealPath();
-                $path     = ltrim(str_replace($source, '', $realPath), '/\\');
-                copy($realPath, sprintf('%s/%s', $target, $path));
-                continue;
-            }
+	/**
+	 * Recursively copy the files from one tree to another.
+	 */
+	protected function recursiveCopy(string $source, string $target): void {
+		if (!is_dir($target)) {
+			mkdir($target, 0777, true);
+		}
 
-            if ($fileInfo->isDir() && ! $fileInfo->isDot()) {
-                $path = $fileInfo->getFilename();
+		if (!is_dir($source)) {
+			return;
+		}
 
-                mkdir($target . '/' . $path, 0777, true);
+		$dir = new DirectoryIterator($source);
+		foreach ($dir as $fileInfo) {
+			if ($fileInfo->isFile()) {
+				$realPath = $fileInfo->getRealPath();
+				$path = ltrim(str_replace($source, '', $realPath), '/\\');
+				copy($realPath, sprintf('%s/%s', $target, $path));
+				continue;
+			}
 
-                $this->recursiveCopy(
-                    $source . DIRECTORY_SEPARATOR . $path,
-                    $target . DIRECTORY_SEPARATOR . $path
-                );
-                continue;
-            }
-        }
-    }
+			if ($fileInfo->isDir() && !$fileInfo->isDot()) {
+				$path = $fileInfo->getFilename();
 
-    /**
-     * Recursively remove a filesystem tree.
-     *
-     * @param string $target Tree to remove.
-     */
-    protected function recursiveDelete(string $target): void
-    {
-        if (! is_dir($target)) {
-            return;
-        }
+				mkdir($target . '/' . $path, 0777, true);
 
-        foreach (scandir($target) as $node) {
-            if (in_array($node, ['.', '..'], true)) {
-                continue;
-            }
+				$this->recursiveCopy(
+					$source . DIRECTORY_SEPARATOR . $path,
+					$target . DIRECTORY_SEPARATOR . $path
+				);
+				continue;
+			}
+		}
+	}
 
-            $path = sprintf('%s/%s', $target, $node);
+	/**
+	 * Recursively remove a filesystem tree.
+	 *
+	 * @param string $target Tree to remove.
+	 */
+	protected function recursiveDelete(string $target): void {
+		if (!is_dir($target)) {
+			return;
+		}
 
-            if (is_dir($path)) {
-                $this->recursiveDelete($path);
-                continue;
-            }
+		foreach (scandir($target) as $node) {
+			if (in_array($node, [ '.', '..' ], true)) {
+				continue;
+			}
 
-            unlink($path);
-        }
+			$path = sprintf('%s/%s', $target, $node);
 
-        rmdir($target);
-    }
+			if (is_dir($path)) {
+				$this->recursiveDelete($path);
+				continue;
+			}
+
+			unlink($path);
+		}
+
+		rmdir($target);
+	}
 }

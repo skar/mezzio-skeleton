@@ -1,5 +1,4 @@
 <?php
-
 declare(strict_types=1);
 
 // phpcs:disable PSR12.Files.FileHeader.IncorrectOrder
@@ -18,18 +17,18 @@ use Mezzio\Container;
 use Mezzio\Middleware\ErrorResponseGenerator;
 
 return [
-    'dependencies' => [
-        'factories' => [
-            ErrorResponseGenerator::class => Container\WhoopsErrorResponseGeneratorFactory::class,
-            'Mezzio\Whoops'               => Container\WhoopsFactory::class,
-            'Mezzio\WhoopsPageHandler'    => Container\WhoopsPageHandlerFactory::class,
-        ],
-    ],
-    'whoops'       => [
-        'json_exceptions' => [
-            'display'    => true,
-            'show_trace' => true,
-            'ajax_only'  => true,
-        ],
-    ],
+	'dependencies' => [
+		'factories' => [
+			ErrorResponseGenerator::class => Container\WhoopsErrorResponseGeneratorFactory::class,
+			'Mezzio\Whoops'               => Container\WhoopsFactory::class,
+			'Mezzio\WhoopsPageHandler'    => Container\WhoopsPageHandlerFactory::class,
+		],
+	],
+	'whoops'       => [
+		'json_exceptions' => [
+			'display'    => true,
+			'show_trace' => true,
+			'ajax_only'  => true,
+		],
+	],
 ];

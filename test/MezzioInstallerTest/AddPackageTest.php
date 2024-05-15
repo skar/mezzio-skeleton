@@ -1,64 +1,67 @@
 <?php
-
 declare(strict_types=1);
 
 namespace MezzioInstallerTest;
 
 use Composer\Package\BasePackage;
 use ReflectionProperty;
-
 use function assert;
 
-class AddPackageTest extends OptionalPackagesTestCase
-{
-    /**
-     * @dataProvider packageProvider
-     */
-    public function testAddPackage(string $packageName, string $packageVersion, ?int $expectedStability): void
-    {
-        $installer = $this->createOptionalPackages();
+final class AddPackageTest extends OptionalPackagesTestCase {
+	/**
+	 * @dataProvider packageProvider
+	 */
+	public function testAddPackage(string $packageName, string $packageVersion, ?int $expectedStability): void {
+		$installer = $this->createOptionalPackages();
 
-        $invocationCount = 0;
+		$invocationCount = 0;
 
-        $this->io
-            ->expects($this->atLeast(2))
-            ->method('write')
-            ->with(self::callback(static function (string $value) use (&$invocationCount): bool {
-                assert($invocationCount === 0 || $invocationCount === 1);
-                $expect = [
-                    0 => 'Removing installer development dependencies',
-                    1 => 'Adding package',
-                ];
-                self::assertStringContainsString($expect[$invocationCount], $value);
-                $invocationCount++;
-                return true;
-            }));
+		$this->io
+			->expects($this->atLeast(2))
+			->method('write')
+			->with(self::callback(static function(string $value) use (&$invocationCount): bool {
+				assert($invocationCount === 0 || $invocationCount === 1);
+				$expect = [
+					0 => 'Removing installer development dependencies',
+					1 => 'Adding package',
+				];
+				self::assertStringContainsString($expect[$invocationCount], $value);
+				$invocationCount++;
 
-        $installer->removeDevDependencies();
-        $installer->addPackage($packageName, $packageVersion);
+				return true;
+			}));
 
-        self::assertPackage('laminas/laminas-stdlib', $installer);
+		$installer->removeDevDependencies();
+		$installer->addPackage($packageName, $packageVersion);
 
-        $r = new ReflectionProperty($installer, 'stabilityFlags');
+		self::assertPackage('laminas/laminas-stdlib', $installer);
 
-        $stabilityFlags = $r->getValue($installer);
+		$r = new ReflectionProperty($installer, 'stabilityFlags');
 
-        // Stability flags are only set for non-stable packages
-        if ($expectedStability) {
-            self::assertArrayHasKey($packageName, $stabilityFlags);
-            self::assertEquals($expectedStability, $stabilityFlags[$packageName]);
-        }
-    }
+		$stabilityFlags = $r->getValue($installer);
 
-    public static function packageProvider(): array
-    {
-        // $packageName, $packageVersion, $expectedStability
-        return [
-            'dev'    => ['laminas/laminas-stdlib', '1.0.0-dev', BasePackage::STABILITY_DEV],
-            'alpha'  => ['laminas/laminas-stdlib', '1.0.0-alpha2', BasePackage::STABILITY_ALPHA],
-            'beta'   => ['laminas/laminas-stdlib', '1.0.0-beta.3', BasePackage::STABILITY_BETA],
-            'RC'     => ['laminas/laminas-stdlib', '1.0.0-RC4', BasePackage::STABILITY_RC],
-            'stable' => ['laminas/laminas-stdlib', '1.0.0', null],
-        ];
-    }
+		// Stability flags are only set for non-stable packages
+		if ($expectedStability !== null) {
+			self::assertArrayHasKey($packageName, $stabilityFlags);
+			self::assertEquals($expectedStability, $stabilityFlags[$packageName]);
+		}
+	}
+
+	/**
+	 * @return array<string, array{
+	 *     0: string,
+	 *     1: string,
+	 *     2: BasePackage::STABILITY_*|null,
+	 * }>
+	 */
+	public static function packageProvider(): array {
+		// $packageName, $packageVersion, $expectedStability
+		return [
+			'dev'    => [ 'laminas/laminas-stdlib', '1.0.0-dev', BasePackage::STABILITY_DEV ],
+			'alpha'  => [ 'laminas/laminas-stdlib', '1.0.0-alpha2', BasePackage::STABILITY_ALPHA ],
+			'beta'   => [ 'laminas/laminas-stdlib', '1.0.0-beta.3', BasePackage::STABILITY_BETA ],
+			'RC'     => [ 'laminas/laminas-stdlib', '1.0.0-RC4', BasePackage::STABILITY_RC ],
+			'stable' => [ 'laminas/laminas-stdlib', '1.0.0', null ],
+		];
+	}
 }
