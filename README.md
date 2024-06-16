@@ -1,7 +1,5 @@
 # Mezzio Skeleton and Installer
 
-[![Build Status](https://github.com/mezzio/mezzio-skeleton/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/mezzio/mezzio-skeleton/actions/workflows/continuous-integration.yml)
-
 *Begin developing PSR-15 middleware applications in seconds!*
 
 [mezzio](https://github.com/mezzio/mezzio) builds on
@@ -10,10 +8,7 @@ provide a minimalist PSR-15 middleware framework for PHP with routing, DI
 container, optional templating, and optional error handling capabilities.
 
 This installer will setup a skeleton application based on mezzio by
-choosing optional packages based on user input as demonstrated in the following
-screenshot:
-
-![screenshot-installer](https://user-images.githubusercontent.com/1011217/90332191-55d32200-dfbb-11ea-80c0-27a07ef5691a.png)
+choosing optional packages based on user input.
 
 The user selected packages are saved into `composer.json` so that everyone else
 working on the project have the same packages installed. Configuration files and
